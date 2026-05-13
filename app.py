@@ -24,7 +24,7 @@ import uvicorn
 # Configuration
 HOST = "127.0.0.1"
 PORT = 5000
-FRONTEND_DIR = Path(__file__).parent / "caliber_chatbot.app"
+FRONTEND_DIR = Path(__file__).parent / "frontend"
 FRONTEND_DIST = FRONTEND_DIR / "dist"
 
 
@@ -102,7 +102,7 @@ def setup_static_files():
         index_file = FRONTEND_DIST / "index.html"
         if index_file.exists():
             return FileResponse(index_file)
-        return {"error": "Frontend not built. Run 'npm run build' in caliber_chatbot.app/"}
+        return {"error": "Frontend not built. Run 'npm run build' in frontend/"}
     
     print("✅ Static file serving configured")
 

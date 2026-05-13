@@ -7,13 +7,24 @@ __pycache__/
 .Python
 *.so
 *.egg-info/
+build/
+dist/
 
 # Node
 node_modules/
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
 
 # Environment
 .env
+.env.local
+.env.*.local
+
+# Build outputs
+/frontend/dist/
+/backend/__pycache__/
 
 # Generated files
 *.png
@@ -27,3 +38,17 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+
+# Logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Runtime
+pids/
+*.pid
+*.seed
+*.pid.lock
+

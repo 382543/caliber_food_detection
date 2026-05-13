@@ -11,13 +11,12 @@
 
 #### Windows:
 ```bash
-start.bat
+python app.py
 ```
 
 #### Linux/Mac:
 ```bash
-chmod +x start.sh
-./start.sh
+python app.py
 ```
 
 #### Or manually:
@@ -25,6 +24,10 @@ chmod +x start.sh
 # Activate virtual environment
 .venv\Scripts\activate  # Windows
 source .venv/bin/activate  # Linux/Mac
+
+# Install dependencies
+pip install -r backend/requirements.txt
+cd frontend && npm install && cd ..
 
 # Run integrated app
 python app.py
@@ -41,27 +44,35 @@ The application will:
 ## 📦 Project Structure
 
 ```
-caliber/
-├── app.py                          # 🔥 MAIN ENTRY POINT - Run this!
-├── start.bat                       # Windows start script
-├── start.sh                        # Linux/Mac start script
-├── requirements.txt                # Python dependencies
-├── render.yaml                     # Render.com deployment config
+project-root/
+│
+├── frontend/                       # React Frontend
+│   ├── public/                     # Static assets
+│   ├── src/                        # React source code
+│   │   ├── pages/                 # Page components
+│   │   │   ├── Camera.jsx        # Food detection
+│   │   │   ├── ChatWidget.jsx    # Health chatbot
+│   │   │   └── Lifestyle.jsx     # Lifestyle tracking
+│   │   ├── components/            # Reusable components
+│   │   └── App.jsx               # Main app component
+│   ├── dist/                      # Built frontend (auto-generated)
+│   ├── package.json              # Node dependencies
+│   ├── vite.config.js            # Vite configuration
+│   └── .env                       # Frontend environment variables
 │
 ├── backend/                        # FastAPI Backend
-│   ├── app.py                     # API routes & ML inference
+│   ├── app.py                     # Main API server
+│   ├── routes/                    # API route handlers
+│   ├── models/                    # ML models & utilities
 │   ├── food_classification_model.keras  # Trained model (77MB)
-│   └── .env                       # API keys (GEMINI_API_KEY)
+│   ├── requirements.txt           # Python dependencies
+│   └── .env                       # Backend environment variables
 │
-└── caliber_chatbot.app/           # React Frontend
-    ├── src/                       # React components
-    │   ├── pages/
-    │   │   ├── Camera.jsx        # Food detection page
-    │   │   ├── ChatWidget.jsx    # Health chatbot
-    │   │   └── Lifestyle.jsx     # Food categories
-    │   └── App.jsx               # Main app
-    ├── dist/                      # Built frontend (auto-generated)
-    └── package.json              # Node dependencies
+├── app.py                         # 🔥 MAIN ENTRY POINT
+├── render.yaml                    # Render.com deployment config
+├── DEPLOY.md                      # Deployment instructions
+├── README.md                      # This file
+└── .gitignore                     # Git ignore rules
 ```
 
 ---
@@ -78,15 +89,15 @@ python -m venv .venv
 source .venv/bin/activate  # Linux/Mac
 
 # Install Python packages
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 ### 2. Install Frontend Dependencies
 ```bash
-cd caliber_chatbot.app
+cd frontend
 npm install
 cd ..
-start.bat
+npm run build
 ```
 
 Frontend will run on: `http://localhost:5173`
@@ -99,31 +110,16 @@ Frontend will run on: `http://localhost:5173`
 
 ## Environment Variables
 
-Create `.env` in `backend/` folder:
+Create `.env` files in both directories:
+
+**backend/.env:**
 ```
 GEMINI_API_KEY=your_api_key_here
 ```
 
-## Project Structure
-
+**frontend/.env:**
 ```
-sushi/
-├── backend/              # FastAPI backend (Port 5000)
-│   ├── app.py           # Main API server
-│   ├── requirements.txt # Python dependencies
-│   ├── .env            # Environment variables
-│   └── food_classification_model.keras
-│
-├── caliber_chatbot.app/ # React frontend (Port 5173)
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Camera.jsx      # Food detection page
-│   │   │   ├── ChatWidget.jsx  # Health chatbot
-│   │   │   └── Lifestyle.jsx   # Lifestyle tracking
-│   │   └── App.jsx
-│   └── package.json
-│
-└── README.md           # This file
+VITE_API_BASE=http://localhost:5000
 ```
 
 ## Features
