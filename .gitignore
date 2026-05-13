@@ -1,3 +1,6 @@
+# Old project structure (deprecated)
+caliber_chatbot.app/
+
 # Python
 .venv/
 __pycache__/
