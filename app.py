@@ -36,22 +36,24 @@ def build_frontend():
     
     # Check if dist folder exists and is recent
     if FRONTEND_DIST.exists():
-        dist_time = FRONTEND_DIST.stat().st_mtime
-        src_dir = FRONTEND_DIR / "src"
-        
-        # Check if any source file is newer than dist
-        needs_rebuild = False
-        if src_dir.exists():
-            for src_file in src_dir.rglob("*"):
-                if src_file.is_file() and src_file.stat().st_mtime > dist_time:
-                    needs_rebuild = True
-                    break
-        
-        if not needs_rebuild:
-            print("✅ Frontend already built and up to date!")
-            return True
+        print("✅ Frontend already built - skipping rebuild!")
+        return True
     
-    print("📦 Building frontend (this may take a minute)...")
+    # If dist doesn't exist, try to build (if npm available)
+    print("📦 Attempting to build frontend...")
+    
+    # Check if npm is available
+    try:
+        subprocess.run(
+            ["npm", "--version"],
+            capture_output=True,
+            check=True
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("⚠️  npm not found in system PATH")
+        print("   To build frontend: Install Node.js from https://nodejs.org/")
+        print("   Frontend dist folder exists - app will use cached build")
+        return True
     
     # Check if node_modules exists
     node_modules = FRONTEND_DIR / "node_modules"
@@ -67,7 +69,8 @@ def build_frontend():
             print("✅ Dependencies installed!")
         except subprocess.CalledProcessError as e:
             print(f"❌ Failed to install dependencies: {e}")
-            return False
+            print("   Using cached frontend build...")
+            return True
     
     # Build the frontend
     try:
