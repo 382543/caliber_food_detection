@@ -4,23 +4,19 @@ services:
     name: caliber-chatbot-fullstack
     runtime: python
     buildCommand: |
-      pip install --upgrade pip setuptools wheel
-      pip install --no-cache-dir --prefer-binary -r backend/requirements.txt
+      pip install --upgrade pip setuptools wheel &&
+      (pip install --only-binary numba,llvmlite --no-cache-dir -r backend/requirements.txt || pip install --prefer-binary --no-cache-dir -r backend/requirements.txt) &&
       cd frontend && npm install && npm run build && cd ..
     startCommand: python app.py
     envVars:
       - key: PYTHON_VERSION
-        value: 3.13.0
+        value: 3.12.0
       - key: NODE_VERSION
         value: 20.10.0
       - key: GEMINI_API_KEY
         sync: false
       - key: RENDER
         value: "true"
-      - key: NUMBA_DISABLE_JIT
-        value: "1"
-      - key: NUMBA_CACHE_DIR
-        value: /tmp
     plan: starter
     healthCheckPath: /health
     autoDeploy: true
