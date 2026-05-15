@@ -1,9 +1,8 @@
-# backend/app.py - Simplified: Chatbot-only (TensorFlow removed for Render)
-from __future__ import annotations
+# backend/app.py - Pure Python WSGI app using Werkzeug (zero compiled deps)
 import os
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+import json
+from werkzeug.wrappers import Request, Response
+from werkzeug.serving import run_simple
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -25,22 +24,21 @@ except ImportError:
 
 # Chatbot system prompt
 SYSTEM_PROMPT = """
-You are Caliber â€” a friendly and knowledgeable AI health assistant.
+You are Caliber — a friendly and knowledgeable AI health assistant.
 
 Your role:
 - Give short, clear, and informative responses about health issues, wellness, and daily care.
 - Provide concise tips, causes, and preventive steps for common symptoms or conditions.
-- Keep explanations brief but meaningful â€” focus on clarity over length.
+- Keep explanations brief but meaningful — focus on clarity over length.
 - Always include a quick precaution or self-care tip when relevant.
-- If the user's issue seems serious, advise consulting a healthcare professional.
+- If the user''s issue seems serious, advise consulting a healthcare professional.
 - Never diagnose diseases or recommend specific medicines.
-- When asked non-medical questions, respond naturally as a helpful chatbot â€” clear, smart, and polite.
 
 Response Style:
-- Keep replies within 4â€“6 concise sentences or bullet points.
+- Keep replies within 4–6 concise sentences or bullet points.
 - Use simple language and friendly tone.
 - Start with reassurance, then share tips or steps.
-- End with a short reminder if needed (e.g., "See a doctor if it gets worse.").
+- End with a short reminder if needed.
 - Avoid long paragraphs, technical jargon, or fear-based statements.
 """
 
@@ -55,71 +53,76 @@ if CHATBOT_ENABLED:
         print(f"Failed to initialize Gemini model: {e}")
         CHATBOT_ENABLED = False
 
-# Pydantic models
-class ChatIn(BaseModel):
-    message: str
 
-class ChatOut(BaseModel):
-    reply: str
+def json_response(data, status=200):
+    """Return JSON response"""
+    return Response(
+        json.dumps(data),
+        status=status,
+        mimetype="application/json"
+    )
 
-# FastAPI app
-app = FastAPI(title="Caliber Food Detection API", version="1.0")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def application(environ, start_response):
+    """WSGI application"""
+    request = Request(environ)
+    path = request.path
+    method = request.method
 
-# Health check endpoint
-@app.get("/health")
-def health_check():
-    """Health check endpoint for Render"""
-    return {
-        "status": "healthy",
-        "service": "caliber-backend",
-        "chatbot_enabled": CHATBOT_ENABLED
-    }
+    # Health check
+    if path == "/health" and method == "GET":
+        return json_response({
+            "status": "healthy",
+            "service": "caliber-backend",
+            "chatbot_enabled": CHATBOT_ENABLED
+        })(environ, start_response)
 
-# Chatbot endpoint
-@app.post("/api/chat")
-def chat(req: ChatIn) -> ChatOut:
-    """Chatbot endpoint using Google Gemini API"""
-    if not CHATBOT_ENABLED:
-        return ChatOut(reply="Chatbot is not available. Please set GEMINI_API_KEY environment variable.")
-    
-    if not req.message.strip():
-        return ChatOut(reply="Please enter a message.")
-    
-    try:
-        response = gemini_model.generate_content(req.message)
-        return ChatOut(reply=response.text)
-    except Exception as e:
-        print(f"Chatbot error: {e}")
-        return ChatOut(reply=f"Error: {str(e)}")
+    # Chatbot endpoint
+    if path == "/api/chat" and method == "POST":
+        try:
+            data = json.loads(request.get_data(as_text=True))
+            message = data.get("message", "").strip()
+            
+            if not message:
+                return json_response({"reply": "Please enter a message."}, 400)(environ, start_response)
+            
+            if not CHATBOT_ENABLED:
+                return json_response({
+                    "reply": "Chatbot is not available. Please set GEMINI_API_KEY."
+                }, 503)(environ, start_response)
+            
+            response = gemini_model.generate_content(message)
+            return json_response({"reply": response.text})(environ, start_response)
+        
+        except Exception as e:
+            print(f"Chatbot error: {e}")
+            return json_response({"reply": f"Error: {str(e)}"}, 500)(environ, start_response)
 
-# Root endpoint
-@app.get("/")
-def root():
-    """API info"""
-    return {
-        "name": "Caliber Food Detection API",
-        "version": "1.0",
-        "endpoints": {
-            "health": "/health",
-            "chat": "/api/chat",
-            "docs": "/docs"
-        }
-    }
+    # Root endpoint
+    if path == "/" and method == "GET":
+        return json_response({
+            "name": "Caliber Food Detection API",
+            "version": "1.0",
+            "endpoints": {
+                "health": "/health",
+                "chat": "/api/chat"
+            }
+        })(environ, start_response)
 
-# OpenAPI docs
-@app.get("/docs")
-def swagger_ui():
-    """Swagger UI documentation"""
-    return {"docs": "Available at /docs"}
+    # CORS preflight
+    if method == "OPTIONS":
+        response = Response("", status=204)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return response(environ, start_response)
+
+    # 404 Not Found
+    return json_response({"error": "Not Found"}, 404)(environ, start_response)
+
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Development server
+    port = int(os.getenv("PORT", 8000))
+    print(f"Starting server on http://0.0.0.0:{port}")
+    run_simple("0.0.0.0", port, application, use_debugger=True, use_reloader=True)
