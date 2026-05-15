@@ -1,6 +1,7 @@
-# backend/app.py - Pure Python WSGI app using Werkzeug (zero compiled deps)
+# backend/app.py - Pure Python WSGI app using Werkzeug + REST API (zero compiled deps)
 import os
 import json
+import requests
 from werkzeug.wrappers import Request, Response
 from werkzeug.serving import run_simple
 from dotenv import load_dotenv
@@ -8,50 +9,50 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Import Gemini API for chatbot
-try:
-    import google.generativeai as genai
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    if GEMINI_API_KEY:
-        genai.configure(api_key=GEMINI_API_KEY)
-        CHATBOT_ENABLED = True
-    else:
-        CHATBOT_ENABLED = False
-        print("WARNING: GEMINI_API_KEY not found. Chatbot will be disabled.")
-except ImportError:
-    CHATBOT_ENABLED = False
-    print("WARNING: google-generativeai not installed. Chatbot will be disabled.")
+# Gemini API configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+CHATBOT_ENABLED = bool(GEMINI_API_KEY)
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+
+if not CHATBOT_ENABLED:
+    print("WARNING: GEMINI_API_KEY not found. Chatbot will be disabled.")
 
 # Chatbot system prompt
-SYSTEM_PROMPT = """
-You are Caliber - a friendly and knowledgeable AI health assistant.
+SYSTEM_PROMPT = """You are Caliber - a friendly and knowledgeable AI health assistant. Give short, clear responses about health issues, wellness, and daily care. Keep replies within 4-6 concise sentences. Never diagnose diseases or recommend specific medicines."""
 
-Your role:
-- Give short, clear, and informative responses about health issues, wellness, and daily care.
-- Provide concise tips, causes, and preventive steps for common symptoms or conditions.
-- Keep explanations brief but meaningful - focus on clarity over length.
-- Always include a quick precaution or self-care tip when relevant.
-- If the user's issue seems serious, advise consulting a healthcare professional.
-- Never diagnose diseases or recommend specific medicines.
 
-Response Style:
-- Keep replies within 4-6 concise sentences or bullet points.
-- Use simple language and friendly tone.
-- Start with reassurance, then share tips or steps.
-- End with a short reminder if needed.
-- Avoid long paragraphs, technical jargon, or fear-based statements.
-"""
-
-# Initialize Gemini model if available
-if CHATBOT_ENABLED:
+def call_gemini_api(message):
+    """Call Google Generative AI REST API directly"""
+    if not CHATBOT_ENABLED:
+        return None
+    
     try:
-        gemini_model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=SYSTEM_PROMPT
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": SYSTEM_PROMPT + "\n\nUser: " + message}
+                    ]
+                }
+            ]
+        }
+        
+        response = requests.post(
+            f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
+            json=payload,
+            timeout=30
         )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "candidates" in data and len(data["candidates"]) > 0:
+                candidate = data["candidates"][0]
+                if "content" in candidate and "parts" in candidate["content"]:
+                    return candidate["content"]["parts"][0].get("text", "No response generated")
+        
+        return f"API Error: {response.status_code} - {response.text[:100]}"
     except Exception as e:
-        print(f"Failed to initialize Gemini model: {e}")
-        CHATBOT_ENABLED = False
+        return f"Error: {str(e)}"
 
 
 def json_response(data, status=200):
@@ -91,8 +92,8 @@ def application(environ, start_response):
                     "reply": "Chatbot is not available. Please set GEMINI_API_KEY."
                 }, 503)(environ, start_response)
             
-            response = gemini_model.generate_content(message)
-            return json_response({"reply": response.text})(environ, start_response)
+            reply = call_gemini_api(message)
+            return json_response({"reply": reply})(environ, start_response)
         
         except Exception as e:
             print(f"Chatbot error: {e}")
