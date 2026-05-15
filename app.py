@@ -16,7 +16,6 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 # Import the WSGI application from backend
 from backend.app import application
-from werkzeug.wsgi import wrap_file
 from werkzeug.wrappers import Response
 from werkzeug.serving import run_simple
 
@@ -74,49 +73,73 @@ def create_integrated_app():
         request = Request(environ)
         path = request.path
         
-        # Route API requests to backend
-        if path.startswith("/api/") or path == "/health":
-            return application(environ, start_response)
-        
-        # Serve static files from frontend/dist
-        if path == "/":
-            file_path = FRONTEND_DIST / "index.html"
-            if file_path.exists():
-                with open(file_path, 'r') as f:
-                    response = Response(f.read(), mimetype='text/html')
+        try:
+            # Route API requests to backend
+            if path.startswith("/api/") or path == "/health":
+                return application(environ, start_response)
+            
+            # Serve static files from frontend/dist
+            if path == "/":
+                file_path = FRONTEND_DIST / "index.html"
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    response = Response(content, mimetype='text/html')
                     return response(environ, start_response)
-        
-        # Check for assets (images, scripts, styles)
-        if path.startswith("/assets/"):
-            static_path = path[1:]  # Remove leading /
-            file_path = FRONTEND_DIST / static_path
-            if file_path.exists() and file_path.is_file():
-                with open(file_path, 'rb') as f:
-                    mimetype = 'application/octet-stream'
-                    if static_path.endswith('.css'):
-                        mimetype = 'text/css'
-                    elif static_path.endswith('.js'):
-                        mimetype = 'application/javascript'
-                    elif static_path.endswith('.png'):
-                        mimetype = 'image/png'
-                    elif static_path.endswith('.jpg') or static_path.endswith('.jpeg'):
-                        mimetype = 'image/jpeg'
-                    elif static_path.endswith('.svg'):
-                        mimetype = 'image/svg+xml'
-                    
-                    response = Response(wrap_file({}, f), mimetype=mimetype)
-                    return response(environ, start_response)
-        
-        # Catch-all: serve index.html for React Router
-        file_path = FRONTEND_DIST / "index.html"
-        if file_path.exists():
-            with open(file_path, 'r') as f:
-                response = Response(f.read(), mimetype='text/html')
+                except Exception:
+                    pass
+            
+            # Check for assets (images, scripts, styles)
+            if path.startswith("/assets/"):
+                static_path = path[1:]  # Remove leading /
+                file_path = FRONTEND_DIST / static_path
+                try:
+                    if file_path.exists() and file_path.is_file():
+                        with open(file_path, 'rb') as f:
+                            content = f.read()
+                        
+                        mimetype = 'application/octet-stream'
+                        if static_path.endswith('.css'):
+                            mimetype = 'text/css; charset=utf-8'
+                        elif static_path.endswith('.js'):
+                            mimetype = 'application/javascript; charset=utf-8'
+                        elif static_path.endswith('.png'):
+                            mimetype = 'image/png'
+                        elif static_path.endswith(('.jpg', '.jpeg')):
+                            mimetype = 'image/jpeg'
+                        elif static_path.endswith('.svg'):
+                            mimetype = 'image/svg+xml; charset=utf-8'
+                        elif static_path.endswith('.json'):
+                            mimetype = 'application/json; charset=utf-8'
+                        
+                        response = Response(content, mimetype=mimetype)
+                        return response(environ, start_response)
+                except Exception:
+                    pass
+            
+            # Catch-all: serve index.html for React Router (SPA)
+            try:
+                file_path = FRONTEND_DIST / "index.html"
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                response = Response(content, mimetype='text/html')
                 return response(environ, start_response)
+            except Exception:
+                pass
+            
+            # 404 Not Found
+            response = Response(json.dumps({"error": "Not Found"}), status=404, mimetype='application/json')
+            return response(environ, start_response)
         
-        # 404 Not Found
-        response = Response(json.dumps({"error": "Not Found"}), status=404, mimetype='application/json')
-        return response(environ, start_response)
+        except Exception as e:
+            # Error handler
+            print(f"WSGI Error: {e}")
+            response = Response(
+                json.dumps({"error": "Internal Server Error", "details": str(e)}),
+                status=500,
+                mimetype='application/json'
+            )
+            return response(environ, start_response)
     
     return integrated_application
 
